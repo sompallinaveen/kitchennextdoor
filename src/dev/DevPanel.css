@@ -1,0 +1,15 @@
+.dev-panel-shell { min-height: 100vh; padding: 36px 18px; background: #fff7ef; }
+.dev-panel { width: min(900px, 100%); margin: 0 auto; padding: 26px; border: 1px solid #f2d9bf; border-radius: 20px; background: white; box-shadow: 0 14px 38px #7c4e2514; }
+.dev-panel h1, .dev-panel h2 { color: #2b1a10; }
+.dev-only-warning { padding: 12px 15px; border: 1px solid #f2b36d; border-radius: 12px; background: #fff5e8; color: #8c3b16; font-weight: 700; }
+.dev-panel-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 24px; }
+.dev-seed-summary { overflow-x: auto; margin: 22px 0; }
+.dev-seed-summary table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+.dev-seed-summary th, .dev-seed-summary td { padding: 10px; border-bottom: 1px solid #f2d9bf; }
+.dev-seed-summary code { color: #2e8b57; font-size: 17px; font-weight: 700; }
+.dev-panel > a { color: #2e8b57; }
+
+@media (max-width: 520px) {
+  .dev-panel { padding: 19px 14px; }
+  .dev-panel-actions { flex-direction: column; align-items: stretch; }
+}
