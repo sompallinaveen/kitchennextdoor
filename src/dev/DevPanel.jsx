@@ -1,61 +1,118 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { resetTestData, seedTestData } from "./seedTestData.js";
-import "./DevPanel.css";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext.jsx";
+import { seedTestData, SUPER_ADMIN_PASSWORD, TEST_PASSWORD } from "./seedTestData.js";
+
+const ROLES = [
+  {
+    id: "buyer",
+    title: "Resident Buyer",
+    email: "buyer@test.com",
+    password: TEST_PASSWORD,
+    description: "Browse menu, place orders, rate cooks",
+    action: "Sign in as Resident Buyer →",
+    path: "/",
+  },
+  {
+    id: "seller",
+    title: "Home Chef",
+    email: "chef@test.com",
+    password: TEST_PASSWORD,
+    description: "Manage dishes, orders & earnings in Seller Studio",
+    action: "Sign in as Home Chef →",
+    path: "/seller",
+  },
+  {
+    id: "admin",
+    title: "Society Admin",
+    email: "admin@test.com",
+    password: TEST_PASSWORD,
+    description: "Verify residents & chefs, manage referrals",
+    action: "Sign in as Society Admin →",
+    path: "/admin",
+  },
+  {
+    id: "superadmin",
+    title: "App Super Admin",
+    email: "super@kitchennextdoor.app",
+    password: SUPER_ADMIN_PASSWORD,
+    description: "Configure societies, settle commission, audit logs",
+    action: "Sign in as App Super Admin →",
+    path: "/super-admin",
+  },
+];
 
 export default function DevPanel() {
-  const [result, setResult] = useState(null);
+  const { login, logout } = useAuth();
+  const navigate = useNavigate();
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [summary, setSummary] = useState(null);
 
-  function loadData() {
+  function reseed() {
     setError("");
+    setMessage("");
     try {
-      setResult(seedTestData());
+      const result = seedTestData();
+      logout();
+      setSummary(result.summary);
+      setMessage("The isolated sandbox data has been reset and re-seeded.");
     } catch (seedError) {
-      setError(seedError.message || "Test data could not be loaded.");
+      setError(seedError.message || "Sandbox data could not be seeded.");
     }
   }
 
-  function clearData() {
-    if (!window.confirm("Clear all KitchenNextDoor browser data for this origin?")) return;
+  function quickLogin(role) {
     setError("");
     try {
-      resetTestData();
-      setResult(null);
-    } catch (resetError) {
-      setError(resetError.message || "App data could not be cleared.");
+      seedTestData();
+      login({
+        identifier: role.email,
+        password: role.password,
+        expectedRole: role.id,
+      });
+      navigate(role.path, { replace: true });
+    } catch (loginError) {
+      setError(loginError.message || "Sandbox sign-in failed.");
     }
   }
 
   return (
     <main className="dev-panel-shell">
       <section className="dev-panel">
-        <p className="eyebrow">Local development tools</p>
-        <h1>KitchenNextDoor test data</h1>
-        <p className="dev-only-warning" role="alert">Development data only. Fake accounts and records; never use real data.</p>
-        <div className="dev-panel-actions">
-          <button className="button button-primary" type="button" onClick={loadData}>Load test data</button>
-          <button className="button button-outline" type="button" onClick={clearData}>Clear all data</button>
+        <p className="eyebrow">INTERACTIVE TESTING SANDBOX</p>
+        <h1>Test Every Role with Seeded Credentials</h1>
+        <p className="dev-panel-description">
+          Pre-configured test accounts ready for instant exploration. Visit the Dev Panel to reset or re-seed anytime.
+        </p>
+        <p className="dev-only-warning" role="note">
+          This sandbox uses isolated <code>dev_sandbox_</code> browser storage. Test actions cannot modify regular app data.
+        </p>
+
+        <div className="dev-sandbox-role-grid">
+          {ROLES.map((role) => (
+            <article className="dev-sandbox-role-card" key={role.id}>
+              <h2>{role.title}</h2>
+              <p>{role.description}</p>
+              <dl>
+                <div><dt>Login</dt><dd>{role.email}</dd></div>
+                <div><dt>Password</dt><dd>{role.password}</dd></div>
+              </dl>
+              <button className="button button-primary" type="button" onClick={() => quickLogin(role)}>
+                {role.action}
+              </button>
+            </article>
+          ))}
         </div>
+
+        <div className="dev-panel-actions">
+          <button className="button button-outline" type="button" onClick={reseed}>
+            Reset / Re-seed Sandbox
+          </button>
+        </div>
+        {message && <p className="dev-sandbox-message" role="status">{message}</p>}
+        {summary && <p className="dev-sandbox-summary">Seeded {summary.registeredAccounts} accounts, {summary.dishes} dishes, {summary.orders} orders, and {summary.issues} issue.</p>}
         {error && <p className="field-error" role="alert">{error}</p>}
-        {result && (
-          <section className="dev-seed-summary" aria-live="polite">
-            <h2>Seed summary</h2>
-            <p><strong>Society:</strong> {result.society.name} · Bengaluru</p>
-            <p><strong>Referral code:</strong> <code>{result.society.referralCode}</code></p>
-            <table>
-              <thead><tr><th>Role</th><th>Name</th><th>Login email</th><th>Status</th></tr></thead>
-              <tbody>{result.accounts.map((account) => (
-                <tr key={`${account.role}-${account.email}`}>
-                  <td>{account.role}</td><td>{account.name}</td><td>{account.email}</td><td>{account.status}</td>
-                </tr>
-              ))}</tbody>
-            </table>
-            <p>Created {result.summary.registeredAccounts} registered accounts, {result.summary.dishes} dishes, {result.summary.polls} polls, {result.summary.orders} orders, and {result.summary.issues} open issue.</p>
-            <p>Refresh the page after seeding to initialize the app session and cart contexts from the new data.</p>
-          </section>
-        )}
-        <Link to="/">Return to the Food Menu</Link>
       </section>
     </main>
   );

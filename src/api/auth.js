@@ -1,3 +1,4 @@
+import { appStorage as localStorage } from "./storage.js";
 import { claimToken, getSocieties, getSociety, validateReferralCode } from "./store.js";
 
 const USERS_KEY = "knd_users";
@@ -71,6 +72,9 @@ export function login({ identifier, password, expectedRole }) {
     throw new Error("We couldn't find an account with those details.");
   }
   if (user.disabled) throw new Error("Your account has been disabled.");
+  if (user.role === "admin" && user.status !== "approved") {
+    throw new Error(`Your Society Admin account is ${user.status || "not approved"}. Contact the App Admin.`);
+  }
   if (expectedRole && user.role !== expectedRole) {
     throw new Error(`This account does not have access to this ${expectedRole === "superadmin" || expectedRole === "app_admin" || expectedRole === "admin" || expectedRole === "society_admin" ? "console" : "account type"}.`);
   }

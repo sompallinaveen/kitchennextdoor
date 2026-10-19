@@ -43,7 +43,7 @@ export default function ResidentsPollsTab({
       <section className="admin-panel admin-residents-panel">
         <div className="admin-panel-heading"><div><p className="admin-eyebrow">Flat verification</p><h3>Pending buyers</h3></div><span className="admin-count-badge">{pending.length}</span></div>
         {pending.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Buyer</th><th>Flat</th><th>Mobile</th><th>Actions</th></tr></thead><tbody>
-          {pending.map((buyer) => <tr key={buyer.id}><td>{buyer.name}</td><td>{[buyer.tower, buyer.flat].filter(Boolean).join(" · ")}</td><td>{buyer.mobile}</td><td className="admin-actions"><button onClick={() => onBuyerStatus(buyer, "approved")}>Approve</button><button className="admin-danger-action" onClick={() => onBuyerStatus(buyer, "rejected")}>Reject</button></td></tr>)}
+          {pending.map((buyer) => <tr key={buyer.id}><td>{buyer.name}</td><td>{[buyer.tower, buyer.flat].filter(Boolean).join(" · ")}</td><td>{buyer.mobile}</td><td className="admin-actions"><button onClick={() => onBuyerStatus(buyer, "approved")}>Approve</button><button className="admin-danger-action" onClick={() => onBuyerStatus(buyer, "rejected")}>Reject</button><button className="admin-danger-action" onClick={() => onBuyerStatus(buyer, "suspended")}>Suspend</button></td></tr>)}
         </tbody></table></div> : <p className="admin-muted">No buyers are waiting for approval.</p>}
         <form className="admin-quick-verify" onSubmit={quickVerify}>
           <label>Quick verify by mobile or flat number<input value={mobileOrFlat} onChange={(event) => setMobileOrFlat(event.target.value)} placeholder="Mobile number or flat" /></label>
@@ -53,8 +53,12 @@ export default function ResidentsPollsTab({
       </section>
       <section className="admin-panel">
         <div className="admin-panel-heading"><div><p className="admin-eyebrow">Everyone in this community</p><h3>All buyers</h3></div></div>
-        {sortedBuyers.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Flat</th><th>Mobile</th><th>Status</th></tr></thead><tbody>
-          {sortedBuyers.map((buyer) => <tr key={buyer.id}><td>{buyer.name}</td><td>{[buyer.tower, buyer.flat].filter(Boolean).join(" · ") || "—"}</td><td>{buyer.mobile}</td><td><span className={`admin-status-badge admin-status-${buyer.status}`}>{buyer.status}</span></td></tr>)}
+        {sortedBuyers.length ? <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Flat</th><th>Mobile</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+          {sortedBuyers.map((buyer) => <tr key={buyer.id}><td>{buyer.name}</td><td>{[buyer.tower, buyer.flat].filter(Boolean).join(" · ") || "—"}</td><td>{buyer.mobile}</td><td><span className={`admin-status-badge admin-status-${buyer.status}`}>{buyer.status}</span></td><td className="admin-actions">
+            {buyer.status !== "approved" && <button onClick={() => onBuyerStatus(buyer, "approved")}>Approve</button>}
+            {buyer.status !== "rejected" && <button className="admin-danger-action" onClick={() => onBuyerStatus(buyer, "rejected")}>Reject</button>}
+            {buyer.status !== "suspended" && <button className="admin-danger-action" onClick={() => onBuyerStatus(buyer, "suspended")}>Suspend</button>}
+          </td></tr>)}
         </tbody></table></div> : <p className="admin-muted">No buyers have registered yet.</p>}
       </section>
       <section className="admin-panel">

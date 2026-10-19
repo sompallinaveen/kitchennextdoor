@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import PollCard from "../components/PollCard.jsx";
 import PollModal from "../components/PollModal.jsx";
 import SiteHeader from "../components/SiteHeader.jsx";
@@ -14,6 +14,9 @@ function isPollClosed(poll, now) {
 
 export default function Polls() {
   const { user } = useAuth();
+  if (user?.role === "seller") {
+    return <Navigate to="/seller" replace />;
+  }
   const [polls, setPolls] = useState([]);
   const [filter, setFilter] = useState(FILTERS[0]);
   const [showModal, setShowModal] = useState(false);

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import DishCard from "../components/DishCard.jsx";
 import CustomiseModal from "../components/CustomiseModal.jsx";
 import ReviewForm from "../components/ReviewForm.jsx";
@@ -19,6 +19,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useCart } from "../context/CartContext.jsx";
 
 const CATEGORIES = ["All Dishes", "Tiffins", "Snacks", "Sweets", "Drinks", "Specials"];
+const KitchenScene = lazy(() => import("../components/KitchenScene.jsx"));
 
 function averageRating(reviews) {
   if (!reviews.length) return null;
@@ -31,6 +32,9 @@ function getFlat(seller) {
 
 export default function HomePage() {
   const { user } = useAuth();
+  if (user?.role === "seller") {
+    return <Navigate to="/seller" replace />;
+  }
   const { addItem } = useCart();
   const navigate = useNavigate();
   const [dishes, setDishes] = useState([]);
@@ -201,8 +205,8 @@ export default function HomePage() {
             {user?.role === "buyer" && user.status === "pending" && (
               <div className="approval-notice" role="status">
                 <span className="notice-dot" />
-                <span><strong>You're on the list!</strong> Your society admin will approve your
-                  flat before you can place an order.</span>
+                <span><strong>You're on the list!</strong> Verification is completed by your Society Admin via the{" "}
+                  <Link to="/admin" className="notice-admin-link">Society Admin Portal</Link> before you can place an order.</span>
               </div>
             )}
             <div className="menu-stats" aria-label="Community food stats">
@@ -212,7 +216,9 @@ export default function HomePage() {
             </div>
           </div>
           <div className="menu-hero-art">
-            <img src="/hero-house.png" alt="A cosy home sharing fresh food with neighbours" />
+            <Suspense fallback={<div className="kitchen-scene-loading" role="status">Preparing a little kitchen…</div>}>
+              <KitchenScene />
+            </Suspense>
             <span className="hero-sparkle sparkle-one" aria-hidden="true">✦</span>
             <span className="hero-sparkle sparkle-two" aria-hidden="true">✦</span>
           </div>

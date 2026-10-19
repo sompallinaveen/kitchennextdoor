@@ -1,15 +1,22 @@
 .dev-panel-shell { min-height: 100vh; padding: 36px 18px; background: #fff7ef; }
 .dev-panel { width: min(900px, 100%); margin: 0 auto; padding: 26px; border: 1px solid #f2d9bf; border-radius: 20px; background: white; box-shadow: 0 14px 38px #7c4e2514; }
 .dev-panel h1, .dev-panel h2 { color: #2b1a10; }
+.dev-panel-description { color: #705849; line-height: 1.6; }
 .dev-only-warning { padding: 12px 15px; border: 1px solid #f2b36d; border-radius: 12px; background: #fff5e8; color: #8c3b16; font-weight: 700; }
-.dev-panel-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 24px; }
-.dev-seed-summary { overflow-x: auto; margin: 22px 0; }
-.dev-seed-summary table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-.dev-seed-summary th, .dev-seed-summary td { padding: 10px; border-bottom: 1px solid #f2d9bf; }
-.dev-seed-summary code { color: #2e8b57; font-size: 17px; font-weight: 700; }
-.dev-panel > a { color: #2e8b57; }
+.dev-sandbox-role-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 22px 0; }
+.dev-sandbox-role-card { padding: 18px; border: 1px solid #f2d9bf; border-radius: 14px; background: #fffdfa; }
+.dev-sandbox-role-card h2 { margin-bottom: 8px; font-size: 22px; }
+.dev-sandbox-role-card > p { min-height: 42px; color: #705849; font-size: 14px; line-height: 1.5; }
+.dev-sandbox-role-card dl { display: grid; gap: 8px; margin: 16px 0; font-size: 13px; }
+.dev-sandbox-role-card dl div { display: grid; grid-template-columns: 72px 1fr; gap: 8px; }
+.dev-sandbox-role-card dt { color: #806854; font-weight: 700; }
+.dev-sandbox-role-card dd { margin: 0; overflow-wrap: anywhere; font-family: monospace; }
+.dev-sandbox-role-card .button { width: 100%; padding: 0 12px; font-size: 13px; }
+.dev-panel-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 12px; }
+.dev-sandbox-message { color: #2e8b57; font-weight: 700; }
+.dev-sandbox-summary { color: #705849; font-size: 13px; }
 
-@media (max-width: 520px) {
+@media (max-width: 650px) {
   .dev-panel { padding: 19px 14px; }
-  .dev-panel-actions { flex-direction: column; align-items: stretch; }
+  .dev-sandbox-role-grid { grid-template-columns: 1fr; }
 }

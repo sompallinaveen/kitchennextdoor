@@ -1,9 +1,10 @@
 // Test data only, never enabled in production.
 import { claimToken, createPoll as createPollRecord, createSociety, createToken, clearAppData, createIssue, getDishes, logAudit, placeOrder, saveAnnouncement, saveDishes, setDevSuperAdminAuth, updateOrderStatus, updateSeller, updateUserStatus, votePoll, banSeller } from "../api/store.js";
-import { register } from "../api/auth.js";
+import { login, register } from "../api/auth.js";
+import { enterSandboxMode } from "../api/storage.js";
 
-const TEST_PASSWORD = "Test@1234";
-const SUPER_ADMIN_PASSWORD = "TestAdmin@123";
+export const TEST_PASSWORD = "Test@1234";
+export const SUPER_ADMIN_PASSWORD = "TestAdmin@123";
 const APP_ADMIN = {
   id: "builtin-superadmin",
   name: "App Admin",
@@ -24,12 +25,14 @@ function addPollVotes(poll, voters) {
 
 export function resetTestData() {
   if (!import.meta.env.DEV) throw new Error("Development data tools are not available in production.");
+  enterSandboxMode();
   clearAppData();
   return { cleared: true };
 }
 
 export function seedTestData() {
   if (!import.meta.env.DEV) throw new Error("Development data tools are not available in production.");
+  enterSandboxMode();
   clearAppData();
   setDevSuperAdminAuth(SUPER_ADMIN_PASSWORD);
 
@@ -55,6 +58,7 @@ export function seedTestData() {
     mobile: "+91 90000 00010",
     password: TEST_PASSWORD,
   }, APP_ADMIN);
+  login({ identifier: admin.email, password: TEST_PASSWORD, expectedRole: "admin" });
 
   const verifiedChef = createAccount({
     name: "Meera Test",
@@ -295,26 +299,6 @@ export function seedTestData() {
       deliveredOrderId: deliveredOrder.id,
       placedOrderId: placedOrder.id,
       issueId: issue.id,
-    },
-  };
-}
-
-export function installDevHelpers() {
-  if (!import.meta.env.DEV) return;
-  const knd = window.knd && typeof window.knd === "object" ? window.knd : {};
-  window.knd = {
-    ...knd,
-    seed: () => {
-      const result = seedTestData();
-      console.info("KitchenNextDoor development data loaded. Development data only.");
-      console.table(result.accounts);
-      console.info("Society referral code:", result.society.referralCode);
-      return result;
-    },
-    reset: () => {
-      const result = resetTestData();
-      console.info("KitchenNextDoor development data cleared. Refresh to update app contexts.");
-      return result;
     },
   };
 }

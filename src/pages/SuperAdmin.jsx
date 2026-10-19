@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import {
-  banChef,
   createSociety,
   createToken,
   exportCommissionCsv,
@@ -16,17 +16,16 @@ import {
   getReviews,
   getSettings,
   getSocietyStats,
-  getSellers,
   logAudit,
   markCommissionSettled,
   regenerateToken,
   replaceAdmin,
+  resetAllProjectData,
   revokeToken,
   saveSettings,
   setAdminDisabled,
-  setBuyerStatus,
+  setAdminStatus,
   suspendSociety,
-  unbanSeller,
   updateSociety,
 } from "../api/store.js";
 import ConfirmModal from "../components/ConfirmModal.jsx";
@@ -48,6 +47,7 @@ function localDate(value) {
 
 export default function SuperAdmin() {
   const { user, logout, updateSuperAdminPassword } = useAuth();
+  const navigate = useNavigate();
   const [tab, setTab] = useState(TABS[0]);
   const [data, setData] = useState({ societies: [], chefs: [], buyers: [], orders: [], issues: [], tokens: [], gmv: 0, commissionEarned: 0, commissionOutstanding: 0 });
   const [dishes, setDishes] = useState([]);
@@ -122,13 +122,9 @@ export default function SuperAdmin() {
     }, `Admin invite generated for ${society.name}.`);
   }
 
-  function confirmCurrentAction(reason) {
+  function confirmCurrentAction() {
     const action = confirmAction;
     if (!action) return "";
-    if (action.type === "banChef") {
-      if (!reason.trim()) return "A ban reason is required.";
-      return execute(() => banChef(action.target.id, reason, user), `${action.target.kitchenName || action.target.name} was banned at platform level.`);
-    }
     if (action.type === "suspendSociety") {
       return execute(() => suspendSociety(action.target.id, true, user), `${action.target.name} was suspended.`);
     }
@@ -154,10 +150,6 @@ export default function SuperAdmin() {
     }
   }
 
-  function updateBuyer(buyer, status) {
-    return execute(() => setBuyerStatus(buyer.id, status, user), `${buyer.name}'s status changed to ${status}.`);
-  }
-
   function handleTokenAction(token, action) {
     if (action === "revoke") {
       execute(() => revokeToken(token.id, user), `Invite for ${data.societies.find((item) => item.id === token.societyId)?.name || "society"} revoked.`);
@@ -168,6 +160,10 @@ export default function SuperAdmin() {
 
   function handleAdminDisabled(admin, disabled) {
     execute(() => setAdminDisabled(admin.id, disabled, user), `${admin.name} ${disabled ? "disabled" : "enabled"}.`);
+  }
+
+  function handleAdminStatus(admin, status) {
+    execute(() => setAdminStatus(admin.id, status, user), `${admin.name}'s status changed to ${status}.`);
   }
 
   function settleCommission(orderIds) {
@@ -212,6 +208,20 @@ export default function SuperAdmin() {
     }
   }
 
+  function resetAllDataAction() {
+    try {
+      resetAllProjectData({ actor: user });
+      logout();
+      navigate("/super-admin", {
+        replace: true,
+        state: { notice: "All project data was reset successfully. Sign in again to continue." },
+      });
+      return "";
+    } catch (resetError) {
+      return resetError.message || "Failed to reset project data.";
+    }
+  }
+
   function submitFirstPassword(event) {
     event.preventDefault();
     setError("");
@@ -247,10 +257,6 @@ export default function SuperAdmin() {
   const badges = {
     Societies: data.societies.filter((society) => !society.adminId).length,
     "Society Admins": data.tokens.filter((token) => token.status === "unused" && token.expiresAt - Date.now() <= 48 * 3_600_000).length,
-    Chefs: data.chefs.filter((chef) => chef.status === "pending").length +
-      (settings?.overdueDays > 0 ? ledger.filter((row) => row.commissionOwed > 0 && row.overdueDays > settings.overdueDays).length : 0),
-    Buyers: data.buyers.filter((buyer) => buyer.status === "pending").length,
-    "Orders and Issues": data.issues.filter((issue) => ["Open", "In review"].includes(issue.status)).length,
     Commission: data.commissionOutstanding > 0 ? 1 : 0,
   };
 
@@ -271,14 +277,14 @@ export default function SuperAdmin() {
         {revealedToken && <section className="super-token-reveal" role="status"><div><strong>New admin invite token</strong><code>{revealedToken.code}</code><span>Expires {new Date(revealedToken.expiresAt).toLocaleString()}</span></div><button type="button" onClick={async () => { try { await navigator.clipboard.writeText(revealedToken.code); setMessage("Invite token copied."); } catch { window.prompt("Copy this invite token:", revealedToken.code); } }}>Copy token</button><button aria-label="Dismiss token" type="button" onClick={() => setRevealedToken(null)}>×</button></section>}
         {tab === "Dashboard" && <DashboardTab data={data} ledger={ledger} settings={settings || { overdueDays: 0 }} onTab={setTab} />}
         {tab === "Societies" && <SocietiesTab societies={data.societies} stats={societyStats} admins={admins} settings={settings || { commissionRate: 5, commissionMin: 5 }} onCreate={createNewSociety} onUpdate={updateSocietyAction} onSuspend={(society, suspend) => setConfirmAction({ type: suspend ? "suspendSociety" : "reactivateSociety", target: society })} onGenerateToken={generateInvite} />}
-        {tab === "Society Admins" && <SocietyAdminsTab admins={admins} societies={data.societies} tokens={tokens} onGenerate={generateInvite} onRevoke={(token) => handleTokenAction(token, "revoke")} onRegenerate={(token) => handleTokenAction(token, "regenerate")} onReplace={(admin) => setConfirmAction({ type: "replaceAdmin", target: admin, societyName: data.societies.find((society) => society.id === admin.societyId)?.name || "this society" })} onDisable={handleAdminDisabled} />}
-        {tab === "Chefs" && <ChefsTab chefs={data.chefs} societies={data.societies} dishes={dishes} orders={data.orders} reviews={reviews} issues={data.issues} ledger={ledger} onBan={(chef) => setConfirmAction({ type: "banChef", target: chef })} onUnban={(chef) => execute(() => unbanSeller(chef.id, chef.societyId, user), `${chef.kitchenName || chef.name} unbanned.`)} />}
-        {tab === "Buyers" && <BuyersTab buyers={data.buyers} societies={data.societies} orders={data.orders} issues={data.issues} onStatus={updateBuyer} />}
+        {tab === "Society Admins" && <SocietyAdminsTab admins={admins} societies={data.societies} tokens={tokens} onGenerate={generateInvite} onRevoke={(token) => handleTokenAction(token, "revoke")} onRegenerate={(token) => handleTokenAction(token, "regenerate")} onReplace={(admin) => setConfirmAction({ type: "replaceAdmin", target: admin, societyName: data.societies.find((society) => society.id === admin.societyId)?.name || "this society" })} onDisable={handleAdminDisabled} onStatus={handleAdminStatus} />}
+        {tab === "Chefs" && <ChefsTab chefs={data.chefs} societies={data.societies} dishes={dishes} orders={data.orders} reviews={reviews} issues={data.issues} ledger={ledger} />}
+        {tab === "Buyers" && <BuyersTab buyers={data.buyers} societies={data.societies} orders={data.orders} issues={data.issues} />}
         {tab === "Orders and Issues" && <OrdersIssuesTab orders={data.orders} issues={data.issues} societies={data.societies} chefs={data.chefs} admins={admins} />}
         {tab === "Commission" && <CommissionTab ledger={ledger} onSettle={settleCommission} onDownload={downloadCsv} />}
-        {tab === "Settings and Audit" && <SettingsAuditTab settings={settings || { commissionRate: 5, commissionMin: 5, tokenExpiryDays: 7, overdueDays: 0 }} audit={audit} onSaveSettings={saveSettingsAction} onChangePassword={changePassword} />}
+        {tab === "Settings and Audit" && <SettingsAuditTab settings={settings || { commissionRate: 5, commissionMin: 5, tokenExpiryDays: 7, overdueDays: 0 }} audit={audit} onSaveSettings={saveSettingsAction} onChangePassword={changePassword} onResetAllData={resetAllDataAction} />}
       </div>
-      {confirmAction && <ConfirmModal title={confirmAction.type === "banChef" ? `Ban ${confirmAction.target.kitchenName || confirmAction.target.name}?` : confirmAction.type === "replaceAdmin" ? `Replace ${confirmAction.target.name}?` : `${confirmAction.type === "suspendSociety" ? "Suspend" : "Reactivate"} ${confirmAction.target.name}?`} description={confirmAction.type === "banChef" ? "The chef will be forced offline, placed orders will be cancelled and restocked, and the Society Admin cannot lift this platform ban." : confirmAction.type === "replaceAdmin" ? `This disables the existing admin and creates a one-time invite for ${confirmAction.societyName}.` : confirmAction.type === "suspendSociety" ? "All kitchens will go offline and new orders will be blocked until the community is reactivated." : "Residents and kitchens in this society will be able to use the marketplace again."} confirmLabel={confirmAction.type === "banChef" ? "Ban chef" : confirmAction.type === "replaceAdmin" ? "Replace and generate invite" : confirmAction.type === "suspendSociety" ? "Suspend society" : "Reactivate society"} requiredText={confirmAction.type === "banChef"} onClose={() => setConfirmAction(null)} onConfirm={confirmCurrentAction} />}
+      {confirmAction && <ConfirmModal title={confirmAction.type === "replaceAdmin" ? `Replace ${confirmAction.target.name}?` : `${confirmAction.type === "suspendSociety" ? "Suspend" : "Reactivate"} ${confirmAction.target.name}?`} description={confirmAction.type === "replaceAdmin" ? `This disables the existing admin and creates a one-time invite for ${confirmAction.societyName}.` : confirmAction.type === "suspendSociety" ? "All kitchens will go offline and new orders will be blocked until the community is reactivated." : "Residents and kitchens in this society will be able to use the marketplace again."} confirmLabel={confirmAction.type === "replaceAdmin" ? "Replace and generate invite" : confirmAction.type === "suspendSociety" ? "Suspend society" : "Reactivate society"} onClose={() => setConfirmAction(null)} onConfirm={confirmCurrentAction} />}
     </main>
   );
 }

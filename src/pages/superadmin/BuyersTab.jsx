@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import DataTable from "../../components/DataTable.jsx";
 
-export default function BuyersTab({ buyers, societies, orders, issues, onStatus }) {
+export default function BuyersTab({ buyers, societies, orders, issues }) {
   const [query, setQuery] = useState("");
   const [societyId, setSocietyId] = useState("");
   const [status, setStatus] = useState("All");
@@ -16,7 +16,7 @@ export default function BuyersTab({ buyers, societies, orders, issues, onStatus 
     { label: "Buyer", render: (buyer) => <><strong>{buyer.name}</strong><small>{societies.find((society) => society.id === buyer.societyId)?.name || "Unknown society"}</small></> },
     { label: "Flat / mobile", render: (buyer) => `${[buyer.tower, buyer.flat].filter(Boolean).join(" · ") || "—"} · ${buyer.mobile}` },
     { label: "Status", render: (buyer) => <span className={`super-status ${buyer.status === "suspended" || buyer.status === "rejected" ? "is-suspended" : ""}`}>{buyer.status}</span> },
-    { label: "Actions", render: (buyer) => <div className="super-row-actions"><button type="button" onClick={() => setSelected(buyer)}>Details</button>{buyer.status !== "approved" && buyer.status !== "suspended" && <button type="button" onClick={() => onStatus(buyer, "approved")}>Approve</button>}{buyer.status !== "rejected" && buyer.status !== "approved" && <button type="button" onClick={() => onStatus(buyer, "rejected")}>Reject</button>}{buyer.status !== "suspended" && buyer.status !== "rejected" && <button type="button" onClick={() => onStatus(buyer, "suspended")}>Suspend</button>}{buyer.status === "suspended" && <button type="button" onClick={() => onStatus(buyer, "approved")}>Reactivate</button>}</div> },
+    { label: "Actions", render: (buyer) => <div className="super-row-actions"><button type="button" onClick={() => setSelected(buyer)}>Details</button></div> },
   ];
   const buyerOrders = selected ? orders.filter((order) => order.buyerId === selected.id) : [];
   return (

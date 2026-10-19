@@ -1,3 +1,10 @@
+import {
+  appStorage as localStorage,
+  APP_DATA_RESET_EVENT,
+  clearSandboxStorage,
+  isSandboxActive,
+} from "./storage.js";
+
 const DISHES_KEY = "knd_dishes";
 const USERS_KEY = "knd_users";
 const REVIEWS_KEY = "knd_reviews";
@@ -12,6 +19,7 @@ const ISSUES_KEY = "knd_issues";
 const TOKENS_KEY = "knd_admin_tokens";
 const SETTINGS_KEY = "knd_app_settings";
 const AUDIT_KEY = "knd_audit";
+const SUPER_ADMIN_AUTH_KEY = "knd_superadmin_auth";
 
 export const APP_STORAGE_KEYS = Object.freeze([
   DISHES_KEY,
@@ -28,20 +36,84 @@ export const APP_STORAGE_KEYS = Object.freeze([
   TOKENS_KEY,
   SETTINGS_KEY,
   AUDIT_KEY,
-  "knd_superadmin_auth",
+  SUPER_ADMIN_AUTH_KEY,
 ]);
 
+export { APP_DATA_RESET_EVENT };
+
+const RESET_ORDER = [
+  CART_KEY,
+  ISSUES_KEY,
+  REVIEWS_KEY,
+  ORDERS_KEY,
+  POLLS_KEY,
+  ANNOUNCEMENT_KEY,
+  DISHES_KEY,
+  TOKENS_KEY,
+  COMMISSION_CONFIGS_KEY,
+  USERS_KEY,
+  SOCIETIES_KEY,
+  AUDIT_KEY,
+  SESSION_KEY,
+];
+
+function purgeAppData() {
+  RESET_ORDER.forEach((key) => localStorage.removeItem(key));
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(DEFAULT_SETTINGS));
+  window.dispatchEvent(new Event(APP_DATA_RESET_EVENT));
+  return { success: true, purgedCollections: [...RESET_ORDER, SETTINGS_KEY], timestamp: Date.now() };
+}
+
+function assertActiveActor(actor, role) {
+  if (!actor || actor.role !== role || typeof actor.id !== "string") {
+    throw new Error(`Only an authenticated ${role === "superadmin" ? "App Admin" : "Society Admin"} can perform this action.`);
+  }
+  const sessionValue = localStorage.getItem(SESSION_KEY);
+  let session;
+  try {
+    session = sessionValue ? JSON.parse(sessionValue) : null;
+  } catch {
+    throw new Error("The active session is invalid. Sign in again before performing this action.");
+  }
+  if (session?.id !== actor.id || session?.role !== role) {
+    throw new Error("The active administrator session could not be verified. Sign in again before performing this action.");
+  }
+}
+
+function assertSocietyAdmin(actor, societyId) {
+  assertActiveActor(actor, "admin");
+  const society = getSociety(societyId);
+  if (!society || society.adminId !== actor.id || actor.societyId !== societyId) {
+    throw new Error("Only the assigned Society Admin can manage buyers and chefs in this society.");
+  }
+}
+
+function assertSuperAdmin(actor) {
+  assertActiveActor(actor, "superadmin");
+}
+
+export function resetAllProjectData({ actor } = {}) {
+  assertSuperAdmin(actor);
+  return purgeAppData();
+}
+
 export function clearAppData() {
-  if (!import.meta.env.DEV) throw new Error("Clearing app data is available only in development.");
-  APP_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+  if (!import.meta.env.DEV || !isSandboxActive()) {
+    throw new Error("Only active development sandbox data can be cleared.");
+  }
+  clearSandboxStorage();
+  window.dispatchEvent(new Event(APP_DATA_RESET_EVENT));
+  return { cleared: true };
 }
 
 export function setDevSuperAdminAuth(password) {
-  if (!import.meta.env.DEV) throw new Error("Development credentials are available only in development.");
+  if (!import.meta.env.DEV || !isSandboxActive()) {
+    throw new Error("Development credentials are available only in the active sandbox.");
+  }
   if (typeof password !== "string" || password.length < 8) {
     throw new Error("The development App Admin password must be at least 8 characters.");
   }
-  localStorage.setItem("knd_superadmin_auth", JSON.stringify({
+  localStorage.setItem(SUPER_ADMIN_AUTH_KEY, JSON.stringify({
     password,
     mustChangePassword: false,
     lastLoginAt: null,
@@ -419,6 +491,7 @@ export function claimToken(code, account, actor) {
 }
 
 export function replaceAdmin(societyId, actor) {
+  assertSuperAdmin(actor);
   const societies = getSocieties();
   const society = societies.find((item) => item.id === societyId);
   if (!society) throw new Error("That society could not be found.");
@@ -441,18 +514,65 @@ export function replaceAdmin(societyId, actor) {
 }
 
 export function setAdminDisabled(adminId, disabled, actor) {
+  assertSuperAdmin(actor);
   const users = getAllUsers();
   const index = users.findIndex((user) => user.id === adminId && user.role === "admin");
   if (index < 0) throw new Error("That Society Admin could not be found.");
-  users[index] = { ...users[index], disabled: Boolean(disabled), disabledAt: disabled ? Date.now() : null };
+  users[index] = {
+    ...users[index],
+    ...(disabled ? {} : { status: "approved" }),
+    disabled: Boolean(disabled),
+    disabledAt: disabled ? Date.now() : null,
+  };
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
   const sessionValue = localStorage.getItem(SESSION_KEY);
   if (sessionValue) {
     const session = JSON.parse(sessionValue);
-    if (session.id === adminId) localStorage.setItem(SESSION_KEY, JSON.stringify({ ...session, disabled: Boolean(disabled) }));
+    if (session.id === adminId) localStorage.setItem(SESSION_KEY, JSON.stringify({
+      ...session,
+      status: users[index].status,
+      disabled: Boolean(disabled),
+    }));
   }
   logAudit({ actor, action: disabled ? "admin.disabled" : "admin.enabled", targetType: "admin", targetId: adminId, details: `${users[index].name} ${disabled ? "disabled" : "enabled"}.` });
   return users[index];
+}
+
+export function setAdminStatus(adminId, status, actor) {
+  assertSuperAdmin(actor);
+  if (!["approved", "rejected", "suspended"].includes(status)) {
+    throw new Error("Choose a valid Society Admin status.");
+  }
+  const users = getAllUsers();
+  const index = users.findIndex((user) => user.id === adminId && user.role === "admin");
+  if (index < 0) throw new Error("That Society Admin could not be found.");
+  const admin = {
+    ...users[index],
+    status,
+    disabled: status !== "approved",
+    disabledAt: status === "approved" ? null : Date.now(),
+  };
+  users[index] = admin;
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  const sessionValue = localStorage.getItem(SESSION_KEY);
+  if (sessionValue) {
+    const session = JSON.parse(sessionValue);
+    if (session.id === adminId) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({
+        ...session,
+        status,
+        disabled: admin.disabled,
+      }));
+    }
+  }
+  logAudit({
+    actor,
+    action: `admin.${status}`,
+    targetType: "admin",
+    targetId: adminId,
+    details: `${admin.name} status changed to ${status}.`,
+  });
+  return admin;
 }
 
 export function regenerateReferral(societyId) {
@@ -512,10 +632,25 @@ export function saveAnnouncement(societyId, text) {
 }
 
 export function updateUserStatus(userId, societyId, status, extra = {}, actor) {
+  assertSocietyAdmin(actor, societyId);
   const users = getAllUsers();
   const index = users.findIndex((user) => user.id === userId && user.societyId === societyId);
   if (index < 0) throw new Error("That resident could not be found in this society.");
-  users[index] = { ...users[index], ...extra, status };
+  const account = users[index];
+  const allowedStatuses = account.role === "buyer"
+    ? ["pending", "approved", "rejected", "suspended"]
+    : account.role === "seller"
+      ? ["pending", "verified", "rejected", "suspended"]
+      : [];
+  if (!allowedStatuses.includes(status)) {
+    throw new Error("That status is not available for this account.");
+  }
+  const allowedExtra = account.role === "seller" ? ["online", "banReason", "bannedAt", "bannedBy"] : [];
+  const changes = Object.fromEntries(Object.entries(extra).filter(([key]) => allowedExtra.includes(key)));
+  if (account.role === "seller" && ["pending", "rejected", "suspended"].includes(status)) {
+    changes.online = false;
+  }
+  users[index] = { ...account, ...changes, status };
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
   if (users[index].role === "buyer" && actor) {
     logAudit({
@@ -532,12 +667,18 @@ export function updateUserStatus(userId, societyId, status, extra = {}, actor) {
 export function verifySeller(sellerId, societyId, actor) {
   const account = getAllUsers().find((user) => user.id === sellerId && user.societyId === societyId);
   if (!account || account.role !== "seller") throw new Error("That resident is not a chef.");
-  const seller = updateUserStatus(sellerId, societyId, "verified", { banReason: "", bannedAt: null }, actor);
+  const seller = updateUserStatus(sellerId, societyId, "verified", {
+    online: false,
+    banReason: "",
+    bannedAt: null,
+    bannedBy: "",
+  }, actor);
   if (actor) logAudit({ actor, action: "chef.verified", targetType: "chef", targetId: sellerId, details: `${seller.kitchenName || seller.name} verified.` });
   return seller;
 }
 
-export function banSeller(sellerId, societyId, reason, actor, bannedBy = "admin") {
+export function banSeller(sellerId, societyId, reason, actor) {
+  assertSocietyAdmin(actor, societyId);
   const cleanReason = String(reason || "").trim();
   if (!cleanReason) throw new Error("A ban reason is required.");
   const users = getAllUsers();
@@ -551,7 +692,7 @@ export function banSeller(sellerId, societyId, reason, actor, bannedBy = "admin"
     online: false,
     banReason: cleanReason,
     bannedAt: Date.now(),
-    bannedBy,
+    bannedBy: "admin",
   };
   const originalSeller = users[sellerIndex];
   users[sellerIndex] = seller;
@@ -591,17 +732,10 @@ export function banSeller(sellerId, societyId, reason, actor, bannedBy = "admin"
   return seller;
 }
 
-export function banChef(sellerId, reason, actor) {
-  const chef = getSellers().find((seller) => seller.id === sellerId);
-  if (!chef?.societyId) throw new Error("That chef could not be found.");
-  return banSeller(sellerId, chef.societyId, reason, actor, "superadmin");
-}
-
 export function unbanSeller(sellerId, societyId, actor) {
+  assertSocietyAdmin(actor, societyId);
   const chef = getAllUsers().find((user) => user.id === sellerId && user.societyId === societyId);
-  if (chef?.bannedBy === "superadmin" && actor?.role !== "superadmin") {
-    throw new Error("Only the App Admin can lift this platform-level ban.");
-  }
+  if (!chef || chef.role !== "seller") throw new Error("That chef could not be found in this society.");
   const seller = updateUserStatus(sellerId, societyId, "verified", {
     online: false,
     banReason: "",
@@ -609,6 +743,27 @@ export function unbanSeller(sellerId, societyId, actor) {
     bannedBy: "",
   }, actor);
   if (actor) logAudit({ actor, action: "chef.unbanned", targetType: "chef", targetId: sellerId, details: `${seller.kitchenName || seller.name} unbanned.` });
+  return seller;
+}
+
+export function setSellerStatus(sellerId, societyId, status, actor) {
+  const allowedStatuses = ["pending", "verified", "rejected", "suspended"];
+  if (!allowedStatuses.includes(status)) {
+    throw new Error("Choose a valid chef status.");
+  }
+  const extra = status === "verified" || status === "rejected" || status === "suspended"
+    ? { online: false, banReason: "", bannedAt: null, bannedBy: "" }
+    : {};
+  const seller = updateUserStatus(sellerId, societyId, status, extra, actor);
+  if (actor) {
+    logAudit({
+      actor,
+      action: `chef.${status}`,
+      targetType: "chef",
+      targetId: sellerId,
+      details: `${seller.kitchenName || seller.name} status changed to ${status}.`,
+    });
+  }
   return seller;
 }
 
@@ -657,6 +812,10 @@ export function createIssue(issue) {
 }
 
 export function addIssueMessage(issueId, user, text) {
+  if (!["buyer", "seller", "admin"].includes(user?.role)) {
+    throw new Error("Only the buyer, chef, or assigned Society Admin can message about this issue.");
+  }
+  assertActiveActor(user, user.role);
   const cleanText = String(text || "").trim();
   if (!cleanText) throw new Error("Write a message before sending it.");
   const issues = readList(ISSUES_KEY, "issue");
@@ -680,6 +839,7 @@ export function addIssueMessage(issueId, user, text) {
 }
 
 export function updateIssueStatus(issueId, admin, { status, outcome = "", note = "" }) {
+  assertSocietyAdmin(admin, admin?.societyId);
   const issues = readList(ISSUES_KEY, "issue");
   const index = issues.findIndex((issue) => issue.id === issueId);
   if (index < 0 || issues[index].societyId !== admin.societyId ||
@@ -861,6 +1021,10 @@ export function getCart() {
 }
 
 export function saveCart(items) {
+  if (items.length === 0) {
+    localStorage.removeItem(CART_KEY);
+    return;
+  }
   localStorage.setItem(CART_KEY, JSON.stringify(items));
 }
 

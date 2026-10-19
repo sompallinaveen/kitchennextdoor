@@ -193,6 +193,12 @@ export default function Checkout() {
             <div className="checkout-total-line"><span>Grand total</span><strong>₹{grandTotal.toFixed(2)}</strong></div>
             <p>No delivery fee. No platform fee.</p>
             {items.some((item) => !dishById.has(item.dishId)) && <p className="cart-item-issue">A dish is no longer available. Return to your cart to remove it.</p>}
+            {user.status !== "approved" && (
+              <p className="cart-item-issue" role="status">
+                Your flat is awaiting Society Admin verification. Verification is completed via the{" "}
+                <Link to="/admin">Society Admin Portal</Link>.
+              </p>
+            )}
             <button className="button button-primary button-full" type="submit" disabled={user.status !== "approved" || Boolean(loadError)}>
               Place order · ₹{grandTotal.toFixed(2)}
             </button>

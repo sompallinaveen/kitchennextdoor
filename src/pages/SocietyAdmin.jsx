@@ -26,7 +26,9 @@ import {
   logAudit,
   regenerateReferral,
   saveAnnouncement,
+  setBuyerStatus,
   setReferralActive,
+  setSellerStatus,
   updateIssueStatus,
   updateUserStatus,
   unbanSeller,
@@ -105,6 +107,15 @@ export default function SocietyAdmin() {
     }
   }
 
+  function changeChefStatus(chef, status) {
+    try {
+      setSellerStatus(chef.id, user.societyId, status, user);
+      completeAction(`${chef.kitchenName || chef.name}'s status changed to ${status}.`);
+    } catch (error) {
+      setActionError(error.message || "Chef status couldn't be updated.");
+    }
+  }
+
   function confirmBan(reason) {
     try {
       banSeller(banTarget.id, user.societyId, reason, user);
@@ -127,7 +138,7 @@ export default function SocietyAdmin() {
 
   function changeBuyerStatus(buyer, status) {
     try {
-      updateUserStatus(buyer.id, user.societyId, status, {}, user);
+      setBuyerStatus(buyer.id, status, user);
       completeAction(`${buyer.name}'s account is ${status}.`);
     } catch (error) {
       setActionError(error.message || "Buyer status couldn't be updated.");
@@ -142,7 +153,7 @@ export default function SocietyAdmin() {
     );
     if (!buyer) return "No pending buyer with that mobile number or flat was found.";
     try {
-      updateUserStatus(buyer.id, user.societyId, "approved", {}, user);
+      setBuyerStatus(buyer.id, "approved", user);
       completeAction(`${buyer.name} has been approved.`);
       return "";
     } catch (error) {
@@ -270,7 +281,7 @@ export default function SocietyAdmin() {
         {dataError ? <div className="admin-empty admin-load-error" role="alert"><h2>Console unavailable</h2><p>{dataError}</p><button className="button button-outline" onClick={refresh}>Try again</button></div> : (
           <>
             {tab === "Dashboard" && <DashboardTab society={currentSociety} chefs={chefs} buyers={buyers} orders={orders} issues={issues} polls={polls} onTab={setTab} />}
-            {tab === "Chefs" && <ChefsTab chefs={chefs} dishes={dishes} orders={orders} reviews={reviews} issues={issues} commissionDue={getCommissionDue} onVerify={verifyChef} onBan={setBanTarget} onUnban={handleUnban} />}
+            {tab === "Chefs" && <ChefsTab chefs={chefs} dishes={dishes} orders={orders} reviews={reviews} issues={issues} commissionDue={getCommissionDue} onVerify={verifyChef} onStatus={changeChefStatus} onBan={setBanTarget} onUnban={handleUnban} />}
             {tab === "Referral" && <ReferralTab society={currentSociety} onRegenerate={handleRegenerateReferral} onToggle={saveReferralActive} />}
             {tab === "Issues" && <IssuesTab issues={issues} orders={orders} chefs={chefs} admin={user} onStatus={handleIssueStatus} onMessage={handleIssueMessage} />}
             {tab === "Buyers and Polls" && <ResidentsPollsTab buyers={buyers} polls={polls} admin={user} now={now} announcement={announcement}

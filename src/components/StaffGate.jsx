@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import SuperAdmin from "../pages/SuperAdmin.jsx";
 import SocietyAdmin from "../pages/SocietyAdmin.jsx";
@@ -6,15 +7,26 @@ import SiteHeader from "./SiteHeader.jsx";
 
 export default function StaffGate({ role, title }) {
   const { user, login, logout, claimAdminInvite } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState(() => location.state?.notice || "");
   const [inviteMode, setInviteMode] = useState(false);
   const [invite, setInvite] = useState({ code: "", name: "", mobile: "", email: "", password: "" });
+
+  useEffect(() => {
+    if (location.state?.notice) {
+      setNotice(location.state.notice);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   function handleSubmit(event) {
     event.preventDefault();
     setError("");
+    setNotice("");
     try {
       if (inviteMode && role === "admin") {
         claimAdminInvite(invite);
@@ -65,6 +77,7 @@ export default function StaffGate({ role, title }) {
           <p className="eyebrow">Staff access</p>
           <h1>{title} login</h1>
           <p className="form-intro">{inviteMode ? "Use your single-use invite token to create the Society Admin account for its assigned community." : "Sign in with your staff account to continue."}</p>
+          {notice && <p className="admin-action-message" role="status">{notice}</p>}
           {inviteMode && role === "admin" ? (
             <>
               <label>Invite token<input autoComplete="off" value={invite.code} onChange={(event) => setInvite({ ...invite, code: event.target.value.toUpperCase() })} required /></label>

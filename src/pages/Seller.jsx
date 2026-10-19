@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import PollCard from "../components/PollCard.jsx";
 import PollModal from "../components/PollModal.jsx";
 import DishForm from "../components/DishForm.jsx";
@@ -643,7 +644,10 @@ export default function Seller() {
         {user.status === "pending" && (
           <div className="seller-pending-banner" role="status">
             <span aria-hidden="true">⌛</span>
-            <p>Your account is awaiting Society Admin approval. You can prepare your dishes now and go online once approved.</p>
+            <p>
+              Your account is awaiting Society Admin verification. Your Society Admin verifies chefs via the{" "}
+              <Link to="/admin" className="seller-admin-link">Society Admin Portal</Link>. You can prepare your dishes now and go online once approved.
+            </p>
           </div>
         )}
         {user.status === "banned" && (

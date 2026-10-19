@@ -4,14 +4,14 @@ function formatDate(value) {
   return value ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(Number(value)) : "Never";
 }
 
-export default function SocietyAdminsTab({ admins, societies, tokens, onGenerate, onRevoke, onRegenerate, onReplace, onDisable }) {
+export default function SocietyAdminsTab({ admins, societies, tokens, onGenerate, onRevoke, onRegenerate, onReplace, onDisable, onStatus }) {
   const adminColumns = [
     { label: "Admin", render: (admin) => <><strong>{admin.name}</strong><small>{admin.email}</small></> },
     { label: "Society", render: (admin) => societies.find((society) => society.id === admin.societyId)?.name || "Unassigned" },
     { label: "Mobile", key: "mobile" },
     { label: "Last login", render: (admin) => formatDate(admin.lastLoginAt) },
-    { label: "Status", render: (admin) => <span className={`super-status ${admin.disabled ? "is-suspended" : ""}`}>{admin.disabled ? "Disabled" : "Active"}</span> },
-    { label: "Actions", render: (admin) => <div className="super-row-actions"><button type="button" onClick={() => onReplace(admin)}>Replace admin</button><button type="button" onClick={() => onDisable(admin, !admin.disabled)}>{admin.disabled ? "Enable" : "Disable"}</button></div> },
+    { label: "Status", render: (admin) => <span className={`super-status ${admin.status !== "approved" || admin.disabled ? "is-suspended" : ""}`}>{admin.disabled ? "Disabled" : admin.status || "approved"}</span> },
+    { label: "Actions", render: (admin) => <div className="super-row-actions"><button type="button" onClick={() => onStatus(admin, "approved")} disabled={admin.status === "approved" && !admin.disabled}>Approve</button><button type="button" onClick={() => onStatus(admin, "rejected")} disabled={admin.status === "rejected"}>Reject</button><button type="button" onClick={() => onStatus(admin, "suspended")} disabled={admin.status === "suspended"}>Suspend</button><button type="button" onClick={() => onReplace(admin)}>Replace admin</button><button type="button" onClick={() => onDisable(admin, !admin.disabled)}>{admin.disabled ? "Enable" : "Disable"}</button></div> },
   ];
   const tokenColumns = [
     { label: "Invite code", render: (token) => <code>{token.code}</code> },

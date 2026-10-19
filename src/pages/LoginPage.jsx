@@ -62,7 +62,8 @@ export default function LoginPage() {
   }, []);
 
   if (user) {
-    return <Navigate to={user.role === "seller" ? "/seller" : "/"} replace />;
+    const destination = user.role === "seller" ? "/seller" : user.role === "admin" ? "/admin" : user.role === "superadmin" ? "/super-admin" : "/";
+    return <Navigate to={destination} replace />;
   }
 
   function update(field, value) {
@@ -237,7 +238,10 @@ export default function LoginPage() {
             {mode === "register" ? "Create my account" : "Log in"}
           </button>
         </form>
-        <Link className="guest-link" to="/">Browse as guest</Link>
+        <div className="login-admin-card">
+          <span>Society Admin? Verification of residents and chefs is handled in the </span>
+          <Link to="/admin">Society Admin Portal →</Link>
+        </div>
       </section>
     </main>
   );

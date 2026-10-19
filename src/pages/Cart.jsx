@@ -48,7 +48,10 @@ export default function Cart() {
           {!!items.length && <Link className="text-action" to="/">Continue browsing</Link>}
         </div>
         {user.status !== "approved" && (
-          <p className="commerce-notice" role="status">Ordering unlocks once your Society Admin approves your flat.</p>
+          <p className="commerce-notice" role="status">
+            Ordering unlocks once verified. Verification of residents is handled by your Society Admin via the{" "}
+            <Link to="/admin">Society Admin Portal</Link>.
+          </p>
         )}
         {loadError && <p className="field-error commerce-error" role="alert">{loadError}</p>}
         {items.length ? (

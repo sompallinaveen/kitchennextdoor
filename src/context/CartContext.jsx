@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { getCart, saveCart } from "../api/store.js";
+import { APP_DATA_RESET_EVENT, getCart, saveCart } from "../api/store.js";
+import { SANDBOX_MODE_KEY, scopedStorageKey } from "../api/storage.js";
 
 const CartContext = createContext(null);
 
@@ -14,6 +15,21 @@ export function CartProvider({ children }) {
   useEffect(() => {
     saveCart(items);
   }, [items]);
+
+  useEffect(() => {
+    function syncCart(event) {
+      if (event.type === APP_DATA_RESET_EVENT || event.key === SANDBOX_MODE_KEY || event.key === scopedStorageKey("knd_cart")) {
+        setItems(getCart());
+      }
+    }
+
+    window.addEventListener(APP_DATA_RESET_EVENT, syncCart);
+    window.addEventListener("storage", syncCart);
+    return () => {
+      window.removeEventListener(APP_DATA_RESET_EVENT, syncCart);
+      window.removeEventListener("storage", syncCart);
+    };
+  }, []);
 
   const addItem = useCallback((item) => {
     const key = makeItemKey(item);

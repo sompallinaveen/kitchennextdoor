@@ -57,13 +57,13 @@ The role names in persisted accounts are `buyer`, `seller`, `admin`, and `supera
 Society Admin accounts can access `/admin` only for their assigned society. The console has:
 
 - **Dashboard:** chef/buyer approval counts, orders today, open issues, seven-day gross order sales, active polls, top chefs by order count, and attention links for pending approvals and issues open over 24 hours.
-- **Chefs:** search/filter, verify pending chefs, inspect dishes/rating/orders/commission/issues, and ban or unban chefs. A ban reason is required.
+- **Chefs:** search/filter, verify, reject, suspend, inspect, and ban or reactivate chefs in the assigned society. A ban reason is required.
 - **Referral:** copy or share the society's chef referral code, regenerate it, and activate/deactivate it.
 - **Issues:** filter and review issues, see the order summary and conversation, add messages, mark `In review`, resolve with an outcome and required note, or dismiss with a required note.
-- **Buyers and Polls:** approve/reject pending buyers, approve by mobile or flat, view all buyers, post/close/delete polls, and set or clear the society announcement.
+- **Buyers and Polls:** approve, reject, or suspend pending and existing buyers; approve by mobile or flat; view all buyers; post/close/delete polls; and set or clear the society announcement.
 - **Kitchens and Orders:** read-only kitchen presence/rating and society order lists with status filters.
 
-The Society Admin cannot lift a platform-level App Admin chef ban. Banning a chef forces them Offline, cancels their `Placed` orders, and restores those dishes' stock; orders already Preparing or Ready are not cancelled.
+Buyer and chef management writes are restricted to the assigned Society Admin; Super-Admin buyer/chef tabs are read-only. Banning a chef forces them Offline, cancels their `Placed` orders, and restores those dishes' stock; orders already Preparing or Ready are not cancelled.
 
 ### App Admin / Super Admin
 
@@ -71,9 +71,9 @@ The built-in App Admin enters `/super-admin`; a new browser profile must change 
 
 - **Dashboard:** society, chef, buyer, today's order, delivered gross merchandise value, settled commission, outstanding commission, 30-day delivered-sales chart, top societies/chefs, and alerts.
 - **Societies:** create/edit societies and commission values, inspect flat/chef/buyer/monthly-sales counts, suspend/reactivate a society, and generate its admin invite.
-- **Society Admins:** inspect admins and last login, create/copy/revoke/regenerate invite tokens, replace an admin, and disable/enable an account.
-- **Chefs:** cross-society search/filter, profile details and leaderboard, and platform ban/unban. Platform bans are tagged so a Society Admin cannot lift them.
-- **Buyers:** search/filter, approve/reject/suspend/reactivate, and inspect order history and issues.
+- **Society Admins:** inspect admins and last login, approve/reject/suspend accounts, create/copy/revoke/regenerate invite tokens, replace an admin, and disable/enable an account.
+- **Chefs:** read-only cross-society search/filter, profile details, status, and leaderboard.
+- **Buyers:** read-only search/filter, status, order history, and issues.
 - **Orders and Issues:** read-only order filters, issue status totals, average resolution times by Society Admin, and issue list.
 - **Commission:** inspect delivered-order commission by society and chef, select unsettled orders, mark settlement, and request a client-generated CSV report.
 - **Settings and Audit:** set new-society commission defaults, token expiry, overdue days, change the App Admin password, and search/filter the newest-first audit log.
@@ -96,7 +96,7 @@ Commission settlement records that an amount was settled; it is not a payment pr
 | Society selection | Buyers/chefs/admins are assigned a `societyId`. Guests choose a society on the menu and poll pages. Menu, polls, reviews, and console data use society filters. Legacy records without an ID attempt to resolve through their owner or society name. |
 | Chef visibility | The menu displays only dishes of `verified`, Online chefs where `dish.available !== false`. A suspended society's chefs are forced Offline and new orders are blocked. |
 | Referral verification | A chef registering with the selected society's matching active referral code becomes `verified`; no code means `pending`. An invalid/inactive non-empty code shows an inline error and blocks that submission; removing the code permits registration as pending. |
-| Chef bans | Ban requires a reason, changes status to `banned`, forces Offline, and cancels/restocks only orders still `Placed`. `Preparing` and `Ready` orders remain. A Society Admin cannot unban a chef with `bannedBy: "superadmin"`. |
+| Chef bans | A Society Admin ban requires a reason, changes status to `banned`, forces Offline, and cancels/restocks only orders still `Placed`. `Preparing` and `Ready` orders remain. Buyer and chef status APIs verify the active Society Admin session and society assignment; Super-Admin sessions are rejected. |
 | Commission formula | `commission = min(orderTotal, max(orderTotal × rate / 100, minimum))`, rounded to two decimal places. Defaults are 5% and ₹5. The chef owes the commission; the buyer pays the listed menu price, without a platform fee. |
 | Commission snapshot and settlement | The rate, minimum and amount are snapshotted on order creation. Later society rate changes do not recompute existing orders. Commission is counted as owed only for delivered statuses (`Delivered`, `Delivered and Paid`, or `Cash received and delivered`); Rejected and Cancelled orders do not accrue due. The App Admin records settlement with timestamp and actor ID. |
 | Payments | There is no gateway. UPI is paid directly to the chef outside this application. Checkout requires a UPI transaction reference for UPI orders; Cash on Handover does not need one. |
@@ -157,19 +157,18 @@ stateDiagram-v2
 
 Resolution outcomes available in the Society Admin UI are `No action`, `Warning to chef`, `Chef banned`, and `Settled between them`. Choosing `Chef banned` uses the resolution note as the ban reason. Closed issues reject further messages.
 
-### Chef ban side effects
+### Chef moderation and ban side effects
 
 ```mermaid
 flowchart TD
-    A[Society Admin or App Admin bans chef] --> B[Require reason]
-    B --> C[Set status banned and force Offline]
-    C --> D[Cancel chef's Placed orders]
-    D --> E[Restore cancelled order quantities to dish stock]
-    C --> F[Preparing and Ready orders remain]
-    F --> G[Chef cannot go Online]
-    A --> H{Ban actor}
-    H -->|App Admin| I[bannedBy is superadmin]
-    I --> J[Only App Admin may unban]
+    A[Assigned Society Admin manages chef] --> B[Verify, reject, or suspend]
+    A --> C[Ban chef with required reason]
+    C --> D[Set status banned and force Offline]
+    D --> E[Cancel chef's Placed orders]
+    E --> F[Restore cancelled order quantities to dish stock]
+    D --> G[Preparing and Ready orders remain]
+    G --> H[Chef cannot go Online]
+    I[App Admin chef and buyer views] --> J[Read-only]
 ```
 
 ### Commission flow
@@ -297,7 +296,7 @@ The actual files in `public/` are:
 
 - `logo_full.png` — login card logo (note the underscore in the actual filename).
 - `logo-house.png` — header logo and favicon.
-- `hero-house.png` — Food Menu hero image.
+- `hero-house.png` — retained static hero artwork; landing and Showcase heroes use the lazy-loaded interactive Three.js kitchen scene with a static fallback when WebGL is unavailable.
 
 The requested/older spelling `logo-full.png` is not present. The login page uses `/logo_full.png`.
 
@@ -311,7 +310,7 @@ The requested/older spelling `logo-full.png` is not present. The login page uses
 
 > **Warning — local development only.** These fake accounts and fixtures are created by the development seeder and are not part of production builds. The built-in App Admin identity exists separately in production; its seeded test password does not. Never use these credentials with real data or deploy them.
 
-To create the accounts, run `npm run dev`, open [`/dev`](http://localhost:5173/dev), and click **Load test data**. Alternatively, call `window.knd.seed()` in the browser console. The seeder clears the app's existing local data before rebuilding the fixtures. To wipe the app data, click **Clear all data** or call `window.knd.reset()`; refresh afterward so in-memory React contexts are reinitialized.
+To use the isolated fixtures, run `npm run dev` and open [`/dev`](http://localhost:5173/dev). Each role card resets/re-seeds the sandbox and signs in as that account; **Reset / Re-seed Sandbox** refreshes the fixtures without signing in. Sandbox records use the `dev_sandbox_` local-storage namespace, and the persistent sandbox banner remains visible while it is active. These actions do not read or modify ordinary app records or sessions.
 
 All seeded users use fake `+91 90000 000xx` mobile numbers. Each account can log in with the email shown below; password values are throwaway local test credentials.
 
@@ -343,7 +342,7 @@ The seeded App Admin uses the test password above and skips the forced password-
 
 ### Reset browser data
 
-The application uses these exact keys:
+The application stores regular app data under these keys:
 
 ```text
 knd_users
@@ -363,13 +362,9 @@ knd_app_settings
 knd_audit
 ```
 
-Run this in DevTools Console on the app's origin to erase all KitchenNextDoor data for that browser origin:
+The App Admin's **Settings and Audit → Reset All Project Data** action clears regular application records in dependency order, restores default settings, and signs out active sessions for this browser origin. The App Admin password is retained so the administrator can sign in again. The reset only affects this browser's local data; this prototype has no server database.
 
-```js
-["knd_users","knd_session","knd_superadmin_auth","knd_dishes","knd_reviews","knd_announcement","knd_cart","knd_polls","knd_orders","knd_commission_configs","knd_societies","knd_issues","knd_admin_tokens","knd_app_settings","knd_audit"].forEach((key) => localStorage.removeItem(key))
-```
-
-This removes every society, account, order and setting, including the changed App Admin password; the built-in account will require the first-login password change again. It only clears storage for the origin where the command runs.
+Use **Reset / Re-seed Sandbox** on `/dev` to clear and rebuild only the `dev_sandbox_` fixture data. Exiting sandbox mode restores the regular app session and cart.
 
 ### First-time test walkthrough
 
@@ -438,13 +433,13 @@ Records are JSON values stored client-side, not database tables. Older data may 
 
 ## Testing report
 
-### Dev seeder verification — 2026-10-19
+### Dev sandbox verification — 2026-10-19
 
 - `npm run build`: **Pass**. Vite produced the production bundle.
-- Production exclusion check: **Pass**. Searched built JavaScript and CSS for `Test Heights`, `Load test data`, `seedTestData`, both test passwords, `window.knd`, `/dev`, and dev-panel styles; none were present. The `/dev` route is added only under `import.meta.env.DEV`, and the console helper is dynamically imported only in development.
+- Production exclusion check: **Pass**. The `/dev` route and its seeded credentials are development-only; the route is added only under `import.meta.env.DEV`. The sandbox adapter ignores sandbox state in production builds.
 - Dev server: **Pass**. `npm run dev -- --host 127.0.0.1` served the app on port 5174 because port 5173 was occupied.
-- Seeder and idempotency: **Pass**. Clicked **Load test data** twice. Both runs contained 1 society, 7 registered users, 3 dishes, 2 polls, 2 orders, 1 issue, and 1 invite token; no duplicate records appeared. The generated referral code changed as expected.
-- Console helpers: **Pass**. Invoked `window.knd.reset()` and confirmed the app storage keys were cleared, then invoked `window.knd.seed()` and confirmed it recreated the fixture. The dev-only route and panel were visible at `/dev`.
+- Quick login seeding: **Pass**. A role-card sign-in re-seeded 1 society, 7 registered users, 3 dishes, 2 polls, 2 orders, 1 issue, and 1 invite token and opened the selected role page.
+- Sandbox storage isolation: **Pass**. Verified sandbox user/session data used `dev_sandbox_` keys and that ordinary app user, session, and cart values were unchanged after quick login and full reset.
 - Test account logins: **Pass** for all eight accounts. Each was submitted in the browser at the requested route/tab, and the expected console or signed-in page/banner appeared:
 
 | Account | Result | Notes |
